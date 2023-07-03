@@ -1,0 +1,133 @@
+resource "azurerm_resource_group" "appgrp" {
+  name     = "app-grp"
+  location = "West Europe"
+}
+
+resource "azurerm_virtual_network" "appnetwork" {
+  name                = "app-network"
+  location            = local.resource_group_location
+  resource_group_name = local.resource_group_name
+  address_space       = [local.virtual_network.address_space]
+  depends_on          = [azurerm_resource_group.appgrp]
+}
+
+resource "azurerm_subnet" "SubnetA" {
+  name                 = local.subnets[0].name
+  resource_group_name  = local.resource_group_name
+  virtual_network_name = local.virtual_network.name
+  address_prefixes     = [local.subnets[0].address_prefix]
+  depends_on           = [azurerm_virtual_network.appnetwork]
+}
+
+resource "azurerm_subnet" "SubnetB" {
+  name                 = local.subnets[1].name
+  resource_group_name  = local.resource_group_name
+  virtual_network_name = local.virtual_network.name
+  address_prefixes     = [local.subnets[1].address_prefix]
+  depends_on = [azurerm_virtual_network.appnetwork,
+  azurerm_resource_group.appgrp]
+
+}
+
+resource "azurerm_network_interface" "appinterface" {
+  name                = "app-interface"
+  location            = local.resource_group_location
+  resource_group_name = local.resource_group_name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.SubnetA.id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id = azurerm_public_ip.appip.id
+  }
+}
+#### Second Interface
+resource "azurerm_network_interface" "appinterface2" {
+  name                = "app-interface2"
+  location            = local.resource_group_location
+  resource_group_name = local.resource_group_name
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.SubnetA.id
+    private_ip_address_allocation = "Dynamic"
+  }
+}
+#Pub-IP
+resource "azurerm_public_ip" "appip" {
+  name                = "app-ip"
+  resource_group_name = local.resource_group_name
+  location            = local.resource_group_location
+  allocation_method   = "Static"
+  depends_on = [ azurerm_resource_group.appgrp ]
+}
+
+output "SubnetA-value" {
+  value = azurerm_subnet.SubnetA.id
+}
+#NSG
+resource "azurerm_network_security_group" "appnsg" {
+  name                = "app-nsg"
+  location            = local.resource_group_location
+  resource_group_name = local.resource_group_name
+
+  security_rule {
+    name                       = "AlloRDP"
+    priority                   = 300
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "3389"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+  depends_on = [ azurerm_resource_group.appgrp ]
+}
+
+resource "azurerm_subnet_network_security_group_association" "appnsgassociation" {
+  subnet_id                 = azurerm_subnet.SubnetA.id
+  network_security_group_id = azurerm_network_security_group.appnsg.id
+}
+#WinVM
+resource "azurerm_windows_virtual_machine" "winvm" {
+  name                = "win-vm"
+  resource_group_name = local.resource_group_name
+  location            = local.resource_group_location
+  size                = "Standard_Ds1_v2"
+  admin_username      = "adminuser"
+  admin_password      = "Azure@007"
+  network_interface_ids = [
+    azurerm_network_interface.appinterface.id,
+    azurerm_network_interface.appinterface2.id
+  ]
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  source_image_reference {
+    publisher = "MicrosoftWindowsServer"
+    offer     = "WindowsServer"
+    sku       = "2019-Datacenter"
+    version   = "latest"
+  }
+}
+#data-disk
+resource "azurerm_managed_disk" "datadisk" {
+  name                 = "data-disk"
+  location             = local.resource_group_location
+  resource_group_name  = local.resource_group_name
+  storage_account_type = "Standard_LRS"
+  create_option        = "Empty"
+  disk_size_gb         = "1"
+  depends_on = [ azurerm_resource_group.appgrp ]
+}
+
+resource "azurerm_virtual_machine_data_disk_attachment" "diskattach" {
+  managed_disk_id    = azurerm_managed_disk.datadisk.id
+  virtual_machine_id = azurerm_windows_virtual_machine.winvm.id
+  lun                = "1"
+  caching            = "ReadWrite"
+}
