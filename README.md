@@ -22,4 +22,7 @@ For tenant_id, go to Azure Active directory.
 For client_id, go to AAD -> App registrations -> New registration -> enter any name like terraform and register
 
 For client_secret, go to newly create secret(terraform in our case) -> Certificates & secrets -> New client secret -> enter any name and add -> Copy the value of secret
-  
+
+At last assign Contributor permission to this newly created Service Principal
+
+Subscription -> Your Azure Subscription -> IAM - > ROle Assignment
