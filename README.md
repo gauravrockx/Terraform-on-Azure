@@ -1,5 +1,6 @@
 # Terraform-on-Azure
-This repo has terraform code for Azure infra 
+This repo has terraform code to learn basics for Azure infra creation
+
 Before starting to learn Azure on Terraform, below are the pre-requisites :-
 1. Azure Account
 2. Microsoft Visual Code (Not mandatory but helpful to code in this IDE)
