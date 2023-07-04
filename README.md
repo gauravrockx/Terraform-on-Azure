@@ -25,4 +25,4 @@ For client_secret, go to newly create secret(terraform in our case) -> Certifica
 
 At last assign Contributor permission to this newly created Service Principal
 
-Subscription -> Your Azure Subscription -> IAM - > ROle Assignment
+Subscription -> Your Azure Subscription -> IAM - > Role Assignment
